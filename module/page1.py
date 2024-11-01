@@ -31,16 +31,24 @@ def menu_1():
         return 200  # หากส่งสำเร็จทุกชุด
     
     def get_database_connection():
-        return mysql.connector.connect(
-            host="192.168.1.123",     # แทนที่ด้วย host ของคุณ
-            user="admin",             # แทนที่ด้วยชื่อผู้ใช้ MySQL ของคุณ
-            password="admin1234",     # แทนที่ด้วยรหัสผ่านของคุณ
-            database="data_stock"     # แทนที่ด้วยชื่อฐานข้อมูลที่ต้องการใช้
-        )
+        try:
+            connection = mysql.connector.connect(
+                host="192.168.1.123",     # แทนที่ด้วย host ของคุณ
+                user="admin",             # แทนที่ด้วยชื่อผู้ใช้ MySQL ของคุณ
+                password="admin1234",     # แทนที่ด้วยรหัสผ่านของคุณ
+                database="data_stock"     # แทนที่ด้วยชื่อฐานข้อมูลที่ต้องการใช้
+            )
+            return connection
+        except mysql.connector.Error as err:
+            st.error("ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้: {}".format(err))
+            return None
 
     # ฟังก์ชันดึงข้อมูลจากฐานข้อมูล
     def load_data():
         conn = get_database_connection()
+        if conn is None:
+            return pd.DataFrame()  # คืนค่า DataFrame ว่างถ้าเชื่อมต่อฐานข้อมูลไม่ได้
+        
         query = "SELECT * FROM product_stock"  # ดึงทุกคอลัมน์จากตาราง product_stock
         df = pd.read_sql(query, conn)
         conn.close()
@@ -48,6 +56,11 @@ def menu_1():
 
     # โหลดข้อมูล
     data = load_data()
+    
+    # ตรวจสอบว่ามีข้อมูลหรือไม่
+    if data.empty:
+        st.warning("ไม่สามารถโหลดข้อมูลจากฐานข้อมูลได้")
+        return  # ออกจากฟังก์ชันหากไม่มีข้อมูล
 
     # คัดลอกข้อมูลที่ต้องการแสดง โดยไม่แสดงคอลัมน์ id ในตาราง
     data_to_display = data[["product_id", "product_detail", "product_stock"]].copy()
@@ -69,7 +82,7 @@ def menu_1():
     # แสดงตารางข้อมูลแบบอ่านอย่างเดียว
     st.dataframe(result_data, height=800, width=1300)
 
-
+    # ตรวจสอบว่าผู้ใช้ต้องการส่งข้อมูลผ่าน LINE หรือไม่
     if st.button("ส่งข้อมูลผ่าน LINE"):
         # กรองข้อมูลที่ต่ำกว่า stock_threshold
         filtered_data = result_data[result_data['product_stock'] < stock_threshold]
